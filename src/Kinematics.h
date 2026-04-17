@@ -35,6 +35,13 @@ private:
     static float appendXYMove(SimulationResult& res, float xFrom, float yFrom, float zConst,
                               float xTo, float yTo, float vmax_x, float vmax_y,
                               float amax_x, float amax_y, float tOffset, float dt);
+    // Hilfsfunktion: XYZ gleichzeitig (oberhalb sicherer Hoehe)
+    static float appendXYZMove(SimulationResult& res,
+                               float xFrom, float yFrom, float zFrom,
+                               float xTo, float yTo, float zTo,
+                               float vmax_x, float vmax_y, float vmax_z,
+                               float amax_x, float amax_y, float amax_z,
+                               float tOffset, float dt);
     // Hilfsfunktion: Verweildauer
     static float appendDwell(SimulationResult& res, float x, float y, float z,
                              float duration, float tOffset, float dt);

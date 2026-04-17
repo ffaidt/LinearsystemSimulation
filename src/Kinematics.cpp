@@ -185,12 +185,43 @@ float Kinematics::appendXYMove(SimulationResult& res, float xFrom, float yFrom, 
     return tOffset + moveTime;
 }
 
+float Kinematics::appendXYZMove(SimulationResult& res,
+                                float xFrom, float yFrom, float zFrom,
+                                float xTo, float yTo, float zTo,
+                                float vmax_x, float vmax_y, float vmax_z,
+                                float amax_x, float amax_y, float amax_z,
+                                float tOffset, float dt) {
+    float dx = xTo - xFrom, dy = yTo - yFrom, dz = zTo - zFrom;
+    float L = std::sqrt(dx*dx + dy*dy + dz*dz);
+    if (L < 1e-6f) return tOffset;
+    float nx = dx/L, ny = dy/L, nz = dz/L;
+    // Finde maximale Pfadgeschwindigkeit/-beschleunigung (limitiert durch jede Achse)
+    float pv = std::numeric_limits<float>::max(), pa = pv;
+    if (std::abs(nx) > 1e-6f) { pv = std::min(pv, vmax_x/std::abs(nx)); pa = std::min(pa, amax_x/std::abs(nx)); }
+    if (std::abs(ny) > 1e-6f) { pv = std::min(pv, vmax_y/std::abs(ny)); pa = std::min(pa, amax_y/std::abs(ny)); }
+    if (std::abs(nz) > 1e-6f) { pv = std::min(pv, vmax_z/std::abs(nz)); pa = std::min(pa, amax_z/std::abs(nz)); }
+    float ta=0, tc=0, vm=0;
+    calcProfile(L, pv, pa, ta, tc, vm);
+    float moveTime = 2.0f * ta + tc;
+    float a_path = (ta > 0) ? vm / ta : 0;
+
+    int steps = static_cast<int>(std::ceil(moveTime / dt));
+    for (int i = 1; i <= steps; ++i) {
+        float tl = std::min(static_cast<float>(i) * dt, moveTime);
+        MotionState sp = evalProfile(tl, 0, L, ta, tc, vm, a_path);
+        float t = tOffset + tl;
+        res.x.t.push_back(t); res.x.s.push_back(xFrom + sp.s*nx); res.x.v.push_back(sp.v*nx); res.x.a.push_back(sp.a*nx);
+        res.y.t.push_back(t); res.y.s.push_back(yFrom + sp.s*ny); res.y.v.push_back(sp.v*ny); res.y.a.push_back(sp.a*ny);
+        res.z.t.push_back(t); res.z.s.push_back(zFrom + sp.s*nz); res.z.v.push_back(sp.v*nz); res.z.a.push_back(sp.a*nz);
+    }
+    return tOffset + moveTime;
+}
+
 // --- Pick & Place Hauptfunktion ---
 SimulationResult Kinematics::calculatePickPlace(const PickPlaceConfig& cfg, float dt) {
     SimulationResult res;
     float t = 0.0f;
 
-    // Startpunkt: Erste Pick-Position
     float curX = cfg.pickPositions[0].x;
     float curY = cfg.pickPositions[0].y;
     float curZ = cfg.pickPositions[0].z;
@@ -205,17 +236,19 @@ SimulationResult Kinematics::calculatePickPlace(const PickPlaceConfig& cfg, floa
         float pickY = cfg.pickPositions[p].y;
         float pickZ = cfg.pickPositions[p].z;
 
-        // 1. Z hoch auf sichere Hoehe (sanftes Losfahren)
+        // 1. Z alleine hoch auf sichere Hoehe (raus aus der Kiste)
         t = appendZMove(res, curX, curY, curZ, cfg.safeZ, cfg.vmax_z, cfg.amax_z,
                         cfg.softDistance, cfg.softAccel, t, dt);
         curZ = cfg.safeZ;
 
-        // 2. XY zur Pick-Position (Z bleibt auf sicherer Hoehe)
-        t = appendXYMove(res, curX, curY, curZ, pickX, pickY,
-                         cfg.vmax_x, cfg.vmax_y, cfg.amax_x, cfg.amax_y, t, dt);
-        curX = pickX; curY = pickY;
+        // 2. XYZ GLEICHZEITIG zur Pick-XY + sichere Hoehe
+        //    (oberhalb safeZ ist keine Kollision moeglich)
+        t = appendXYZMove(res, curX, curY, curZ, pickX, pickY, cfg.safeZ,
+                          cfg.vmax_x, cfg.vmax_y, cfg.vmax_z,
+                          cfg.amax_x, cfg.amax_y, cfg.amax_z, t, dt);
+        curX = pickX; curY = pickY; curZ = cfg.safeZ;
 
-        // 3. Z runter zur Pick-Hoehe (sanftes Abbremsen)
+        // 3. Z alleine runter zur Pick-Hoehe (sanft in die Kiste)
         t = appendZMove(res, curX, curY, curZ, pickZ, cfg.vmax_z, cfg.amax_z,
                         cfg.softDistance, cfg.softAccel, t, dt);
         curZ = pickZ;
@@ -223,17 +256,19 @@ SimulationResult Kinematics::calculatePickPlace(const PickPlaceConfig& cfg, floa
         // 4. Verweilen am Pick
         t = appendDwell(res, curX, curY, curZ, cfg.dwellTime, t, dt);
 
-        // 5. Z hoch auf sichere Hoehe
+        // 5. Z alleine hoch auf sichere Hoehe (raus aus der Kiste)
         t = appendZMove(res, curX, curY, curZ, cfg.safeZ, cfg.vmax_z, cfg.amax_z,
                         cfg.softDistance, cfg.softAccel, t, dt);
         curZ = cfg.safeZ;
 
-        // 6. XY zur Place-Position
-        t = appendXYMove(res, curX, curY, curZ, cfg.placePosition.x, cfg.placePosition.y,
-                         cfg.vmax_x, cfg.vmax_y, cfg.amax_x, cfg.amax_y, t, dt);
-        curX = cfg.placePosition.x; curY = cfg.placePosition.y;
+        // 6. XYZ GLEICHZEITIG zur Place-Position + sichere Hoehe
+        t = appendXYZMove(res, curX, curY, curZ,
+                          cfg.placePosition.x, cfg.placePosition.y, cfg.safeZ,
+                          cfg.vmax_x, cfg.vmax_y, cfg.vmax_z,
+                          cfg.amax_x, cfg.amax_y, cfg.amax_z, t, dt);
+        curX = cfg.placePosition.x; curY = cfg.placePosition.y; curZ = cfg.safeZ;
 
-        // 7. Z runter zur Place-Hoehe
+        // 7. Z alleine runter zur Place-Hoehe
         t = appendZMove(res, curX, curY, curZ, cfg.placePosition.z, cfg.vmax_z, cfg.amax_z,
                         cfg.softDistance, cfg.softAccel, t, dt);
         curZ = cfg.placePosition.z;
@@ -241,7 +276,7 @@ SimulationResult Kinematics::calculatePickPlace(const PickPlaceConfig& cfg, floa
         // 8. Verweilen am Place
         t = appendDwell(res, curX, curY, curZ, cfg.dwellTime, t, dt);
 
-        // 9. Z hoch auf sichere Hoehe (fuer naechsten Pick)
+        // 9. Z alleine hoch auf sichere Hoehe (fuer naechsten Pick)
         t = appendZMove(res, curX, curY, curZ, cfg.safeZ, cfg.vmax_z, cfg.amax_z,
                         cfg.softDistance, cfg.softAccel, t, dt);
         curZ = cfg.safeZ;
