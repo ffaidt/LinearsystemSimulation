@@ -337,7 +337,7 @@ void Gui::renderPickPreview3D(ImVec2 canvasPos, ImVec2 canvasSize) {
 }
 
 void Gui::renderPickPopup() {
-    ImVec2 popupSize(720, 580);
+    ImVec2 popupSize(500, 700);
     ImGui::SetNextWindowSize(popupSize, ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("PickGenerator", nullptr, ImGuiWindowFlags_NoResize)) {
         ImGui::Text("Pick-Positionen Grid-Generator");
@@ -345,13 +345,14 @@ void Gui::renderPickPopup() {
 
         ImGui::Text("First Pick (oberste Ebene, erste Position):");
         ImGui::DragFloat("First X", &m_firstPick.x, 0.5f, 0.0f, 0.0f, "%.1f mm");
-        ImGui::SameLine(); ImGui::DragFloat("First Y", &m_firstPick.y, 0.5f, 0.0f, 0.0f, "%.1f mm");
-        ImGui::SameLine(); ImGui::DragFloat("First Z", &m_firstPick.z, 0.5f, 0.0f, 0.0f, "%.1f mm");
+        ImGui::DragFloat("First Y", &m_firstPick.y, 0.5f, 0.0f, 0.0f, "%.1f mm");
+        ImGui::DragFloat("First Z", &m_firstPick.z, 0.5f, 0.0f, 0.0f, "%.1f mm");
 
+        ImGui::Spacing();
         ImGui::Text("Last Pick (unterste Ebene, letzte Position):");
         ImGui::DragFloat("Last X", &m_lastPick.x, 0.5f, 0.0f, 0.0f, "%.1f mm");
-        ImGui::SameLine(); ImGui::DragFloat("Last Y", &m_lastPick.y, 0.5f, 0.0f, 0.0f, "%.1f mm");
-        ImGui::SameLine(); ImGui::DragFloat("Last Z", &m_lastPick.z, 0.5f, 0.0f, 0.0f, "%.1f mm");
+        ImGui::DragFloat("Last Y", &m_lastPick.y, 0.5f, 0.0f, 0.0f, "%.1f mm");
+        ImGui::DragFloat("Last Z", &m_lastPick.z, 0.5f, 0.0f, 0.0f, "%.1f mm");
 
         ImGui::Separator();
 
