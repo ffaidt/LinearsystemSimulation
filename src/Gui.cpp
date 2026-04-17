@@ -388,10 +388,10 @@ void Gui::renderPickPopup() {
 
         if (ImGui::Button("Vorschau generieren", ImVec2(-1, 28))) {
             m_previewPicks.clear();
-            // Reihenfolge: Spalte fuer Spalte (horiz), jede Spalte von oben nach unten
-            for (int ix = 0; ix < nHoriz; ++ix) {
-                for (int iy = 0; iy < nHorizY; ++iy) {
-                    for (int iz = 0; iz < nZ; ++iz) {
+            // Reihenfolge: Erst alle XY auf einer Ebene, dann naechste Ebene runter
+            for (int iz = 0; iz < nZ; ++iz) {
+                for (int ix = 0; ix < nHoriz; ++ix) {
+                    for (int iy = 0; iy < nHorizY; ++iy) {
                         float fx = (nHoriz > 1) ? (float)ix / (nHoriz - 1) : 0.0f;
                         float fy = (nHorizY > 1) ? (float)iy / (nHorizY - 1) : 0.0f;
                         float fz = (nZ > 1) ? (float)iz / (nZ - 1) : 0.0f;
