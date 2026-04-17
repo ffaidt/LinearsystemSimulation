@@ -63,22 +63,19 @@ void Gui::renderConfigPanel() {
             ImGui::Separator();
 
             ImGui::Text("--- Pick-Positionen (%d) ---", (int)pp.pickPositions.size());
-            for (int i = 0; i < (int)pp.pickPositions.size(); ++i) {
-                ImGui::PushID(i);
-                ImGui::Text("Pick %d:", i + 1);
-                ImGui::DragFloat("X", &pp.pickPositions[i].x, 0.5f, 0.0f, 0.0f, "%.1f mm");
-                ImGui::SameLine(); ImGui::DragFloat("Y", &pp.pickPositions[i].y, 0.5f, 0.0f, 0.0f, "%.1f mm");
-                ImGui::SameLine(); ImGui::DragFloat("Z", &pp.pickPositions[i].z, 0.5f, 0.0f, 0.0f, "%.1f mm");
-                ImGui::SameLine();
-                if (pp.pickPositions.size() > 1 && ImGui::Button("X##del")) {
-                    pp.pickPositions.erase(pp.pickPositions.begin() + i);
-                    ImGui::PopID(); break;
+            if (ImGui::Button("Pick-Positionen konfigurieren...", ImVec2(-1, 30))) {
+                m_showPickPopup = true;
+                m_previewReady = false;
+                ImGui::OpenPopup("PickGenerator");
+            }
+            // Kompakte Anzeige der aktuellen Picks
+            if (ImGui::BeginChild("##PickList", ImVec2(-1, 120), true)) {
+                for (int i = 0; i < (int)pp.pickPositions.size(); ++i) {
+                    ImGui::Text("%d: (%.1f, %.1f, %.1f)", i + 1,
+                        pp.pickPositions[i].x, pp.pickPositions[i].y, pp.pickPositions[i].z);
                 }
-                ImGui::PopID();
             }
-            if (ImGui::Button("+ Pick hinzufuegen", ImVec2(-1, 25))) {
-                pp.pickPositions.push_back({0, 0, 0});
-            }
+            ImGui::EndChild();
             ImGui::Spacing();
 
             if (ImGui::Button("Simulation Starten##PP", ImVec2(-1, 30))) {
@@ -86,6 +83,9 @@ void Gui::renderConfigPanel() {
                 m_hasResult = true;
                 m_animationTime = 0; m_isPlaying = false;
             }
+
+            renderPickPopup();
+
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -260,6 +260,144 @@ void Gui::renderAnimation() {
     }
     ImGui::EndChild();
     ImGui::End();
+}
+
+void Gui::renderPickPreview3D(ImVec2 canvasPos, ImVec2 canvasSize) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImGui::SetCursorScreenPos(canvasPos);
+    ImGui::InvisibleButton("##PickPreview3D", canvasSize);
+    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
+        ImVec2 d = ImGui::GetIO().MouseDelta;
+        m_prevRotZ += d.x * 0.01f;
+        m_prevRotX += d.y * 0.01f;
+        if (m_prevRotX < -1.5f) m_prevRotX = -1.5f;
+        if (m_prevRotX > 1.5f) m_prevRotX = 1.5f;
+    }
+    if (ImGui::IsItemHovered()) {
+        float w = ImGui::GetIO().MouseWheel;
+        if (w != 0) { m_prevZoom *= (1+w*0.1f); if(m_prevZoom<0.1f)m_prevZoom=0.1f; if(m_prevZoom>10)m_prevZoom=10; }
+    }
+    dl->AddRectFilled(canvasPos, ImVec2(canvasPos.x+canvasSize.x, canvasPos.y+canvasSize.y), IM_COL32(25,25,35,255));
+    dl->PushClipRect(canvasPos, ImVec2(canvasPos.x+canvasSize.x, canvasPos.y+canvasSize.y), true);
+
+    float cz=cosf(m_prevRotZ),sz=sinf(m_prevRotZ),cx=cosf(m_prevRotX),sx=sinf(m_prevRotX);
+    // Bounds
+    float mnX=1e9f,mxX=-1e9f,mnY=1e9f,mxY=-1e9f,mnZ=1e9f,mxZ=-1e9f;
+    for (auto& p : m_previewPicks) {
+        if(p.x<mnX)mnX=p.x; if(p.x>mxX)mxX=p.x;
+        if(p.y<mnY)mnY=p.y; if(p.y>mxY)mxY=p.y;
+        if(p.z<mnZ)mnZ=p.z; if(p.z>mxZ)mxZ=p.z;
+    }
+    auto& pl = m_config.pp.placePosition;
+    if(pl.x<mnX)mnX=pl.x; if(pl.x>mxX)mxX=pl.x;
+    if(pl.y<mnY)mnY=pl.y; if(pl.y>mxY)mxY=pl.y;
+    if(pl.z<mnZ)mnZ=pl.z; if(pl.z>mxZ)mxZ=pl.z;
+    float pad=10; mnX-=pad;mxX+=pad;mnY-=pad;mxY+=pad;mnZ-=pad;mxZ+=pad;
+    float midX=(mnX+mxX)*0.5f,midY=(mnY+mxY)*0.5f,midZ=(mnZ+mxZ)*0.5f;
+    float span=fmaxf(fmaxf(mxX-mnX,mxY-mnY),fmaxf(mxZ-mnZ,1.0f));
+    float scale=fminf(canvasSize.x,canvasSize.y)*0.35f/span*m_prevZoom;
+    ImVec2 center(canvasPos.x+canvasSize.x*0.5f,canvasPos.y+canvasSize.y*0.5f);
+    auto project=[&](float px,float py,float pz)->ImVec2{
+        float dx=px-midX,dy=py-midY,dz=pz-midZ;
+        float rx=cz*dx-sz*dy,ry=sz*dx+cz*dy;
+        float fz=sx*ry+cx*dz;
+        return ImVec2(center.x+rx*scale,center.y-fz*scale);
+    };
+    // Grid
+    float bx[2]={mnX,mxX},by[2]={mnY,mxY},bz[2]={mnZ,mxZ};
+    ImU32 gc=IM_COL32(60,60,80,100);
+    for(int i=0;i<2;++i)for(int j=0;j<2;++j){
+        dl->AddLine(project(bx[0],by[i],bz[j]),project(bx[1],by[i],bz[j]),gc);
+        dl->AddLine(project(bx[i],by[0],bz[j]),project(bx[i],by[1],bz[j]),gc);
+        dl->AddLine(project(bx[i],by[j],bz[0]),project(bx[i],by[j],bz[1]),gc);
+    }
+    // Axes
+    float axL=span*0.4f; ImVec2 o0=project(midX,midY,midZ);
+    dl->AddLine(o0,project(midX+axL,midY,midZ),IM_COL32(255,80,80,180),1.5f);
+    dl->AddLine(o0,project(midX,midY+axL,midZ),IM_COL32(80,255,80,180),1.5f);
+    dl->AddLine(o0,project(midX,midY,midZ+axL),IM_COL32(80,80,255,180),1.5f);
+    dl->AddText(project(midX+axL,midY,midZ),IM_COL32(255,100,100,255),"X");
+    dl->AddText(project(midX,midY+axL,midZ),IM_COL32(100,255,100,255),"Y");
+    dl->AddText(project(midX,midY,midZ+axL),IM_COL32(100,100,255,255),"Z");
+
+    // Pick-Punkte (nummeriert)
+    for (int i = 0; i < (int)m_previewPicks.size(); ++i) {
+        ImVec2 p = project(m_previewPicks[i].x, m_previewPicks[i].y, m_previewPicks[i].z);
+        dl->AddCircleFilled(p, 5, IM_COL32(50,200,255,255));
+        char buf[16]; snprintf(buf, sizeof(buf), "%d", i+1);
+        dl->AddText(ImVec2(p.x+6, p.y-6), IM_COL32(200,220,255,255), buf);
+    }
+    // Place-Punkt
+    ImVec2 pp2 = project(pl.x, pl.y, pl.z);
+    dl->AddCircleFilled(pp2, 7, IM_COL32(255,180,50,255));
+    dl->AddText(ImVec2(pp2.x+8, pp2.y-6), IM_COL32(255,200,100,255), "Place");
+
+    dl->AddText(ImVec2(canvasPos.x+5,canvasPos.y+5),IM_COL32(180,180,180,180),"Maus ziehen = Drehen");
+    dl->PopClipRect();
+}
+
+void Gui::renderPickPopup() {
+    ImVec2 popupSize(700, 550);
+    ImGui::SetNextWindowSize(popupSize, ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("PickGenerator", nullptr, ImGuiWindowFlags_NoResize)) {
+        ImGui::Text("Pick-Positionen Grid-Generator");
+        ImGui::Separator();
+
+        ImGui::Text("First Pick (oben links, oberste Ebene):");
+        ImGui::DragFloat("First X", &m_firstPick.x, 0.5f, 0.0f, 0.0f, "%.1f mm");
+        ImGui::SameLine(); ImGui::DragFloat("First Y", &m_firstPick.y, 0.5f, 0.0f, 0.0f, "%.1f mm");
+        ImGui::SameLine(); ImGui::DragFloat("First Z", &m_firstPick.z, 0.5f, 0.0f, 0.0f, "%.1f mm");
+
+        ImGui::Text("Last Pick (unten rechts, unterste Ebene):");
+        ImGui::DragFloat("Last X", &m_lastPick.x, 0.5f, 0.0f, 0.0f, "%.1f mm");
+        ImGui::SameLine(); ImGui::DragFloat("Last Y", &m_lastPick.y, 0.5f, 0.0f, 0.0f, "%.1f mm");
+        ImGui::SameLine(); ImGui::DragFloat("Last Z", &m_lastPick.z, 0.5f, 0.0f, 0.0f, "%.1f mm");
+
+        ImGui::DragInt("Spalten (X)", &m_gridCols, 0.1f, 1, 50);
+        ImGui::SameLine(); ImGui::DragInt("Reihen (Y)", &m_gridRows, 0.1f, 1, 50);
+        ImGui::SameLine(); ImGui::DragInt("Ebenen (Z)", &m_gridLayers, 0.1f, 1, 50);
+
+        if (ImGui::Button("Vorschau generieren", ImVec2(-1, 28))) {
+            m_previewPicks.clear();
+            // Reihenfolge: Spalte fuer Spalte, jede Spalte von oben nach unten
+            for (int col = 0; col < m_gridCols; ++col) {
+                for (int row = 0; row < m_gridRows; ++row) {
+                    for (int layer = 0; layer < m_gridLayers; ++layer) {
+                        float fx = (m_gridCols > 1) ? (float)col / (m_gridCols - 1) : 0.0f;
+                        float fy = (m_gridRows > 1) ? (float)row / (m_gridRows - 1) : 0.0f;
+                        float fz = (m_gridLayers > 1) ? (float)layer / (m_gridLayers - 1) : 0.0f;
+                        Vec3 p;
+                        p.x = m_firstPick.x + fx * (m_lastPick.x - m_firstPick.x);
+                        p.y = m_firstPick.y + fy * (m_lastPick.y - m_firstPick.y);
+                        p.z = m_firstPick.z + fz * (m_lastPick.z - m_firstPick.z);
+                        m_previewPicks.push_back(p);
+                    }
+                }
+            }
+            m_previewReady = true;
+        }
+
+        if (m_previewReady && !m_previewPicks.empty()) {
+            ImGui::Text("Vorschau: %d Positionen (Blau=Pick, Orange=Place)", (int)m_previewPicks.size());
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            float previewH = avail.y - 35;
+            ImVec2 cPos = ImGui::GetCursorScreenPos();
+            renderPickPreview3D(cPos, ImVec2(avail.x, previewH));
+            ImGui::SetCursorScreenPos(ImVec2(cPos.x, cPos.y + previewH + 5));
+
+            float btnW = (avail.x - 10) * 0.5f;
+            if (ImGui::Button("Uebernehmen", ImVec2(btnW, 28))) {
+                m_config.pp.pickPositions = m_previewPicks;
+                m_previewReady = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Zurueck", ImVec2(btnW, 28))) {
+                m_previewReady = false;
+            }
+        }
+        ImGui::EndPopup();
+    }
 }
 
 void Gui::render() {
