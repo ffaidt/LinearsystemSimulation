@@ -1,4 +1,4 @@
-# Anti-Gravity Kinematics
+# Linearsystem Simulation
 
 Ein C++ Softwareprojekt zur Kinematik-Simulation eines 3D-Linearachsensystems im Punkt-zu-Punkt-Betrieb (PTP).
 
@@ -36,4 +36,4 @@ cmake ..
 cmake --build . --config Release
 ```
 
-Anschließend kann die Datei `AntiGravityKinematics` im Build-Ordner ausgeführt werden.
+Anschließend kann die Datei `LinearsystemSimulation` im Build-Ordner ausgeführt werden.
