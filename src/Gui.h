@@ -29,8 +29,9 @@ private:
     float m_animationTime = 0.0f;
     bool m_isPlaying = false;
     
-    // 3D-Rotation (per Maus-Drag)
+    // 3D-Rotation und Zoom (per Maus)
     float m_rotX = 0.45f;  // Elevation (~25°)
     float m_rotZ = 0.78f;  // Azimut (~45°)
+    float m_zoom = 1.0f;   // Zoom-Faktor (Scrollrad)
     bool m_isDragging3D = false;
 };

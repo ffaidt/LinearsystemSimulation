@@ -102,6 +102,14 @@ void Gui::render3DView(int currentIndex, int count, ImVec2 canvasPos, ImVec2 can
         if (m_rotX < -1.5f) m_rotX = -1.5f;
         if (m_rotX > 1.5f) m_rotX = 1.5f;
     }
+    if (ImGui::IsItemHovered()) {
+        float wheel = ImGui::GetIO().MouseWheel;
+        if (wheel != 0.0f) {
+            m_zoom *= (1.0f + wheel * 0.1f);
+            if (m_zoom < 0.1f) m_zoom = 0.1f;
+            if (m_zoom > 10.0f) m_zoom = 10.0f;
+        }
+    }
     dl->AddRectFilled(canvasPos, ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y), IM_COL32(25, 25, 35, 255));
     dl->PushClipRect(canvasPos, ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y), true);
     float cz = cosf(m_rotZ), sz = sinf(m_rotZ);
@@ -117,7 +125,7 @@ void Gui::render3DView(int currentIndex, int count, ImVec2 canvasPos, ImVec2 can
     minX -= pad; maxX += pad; minY -= pad; maxY += pad; minZ -= pad; maxZ += pad;
     float midX = (minX+maxX)*0.5f, midY = (minY+maxY)*0.5f, midZ = (minZ+maxZ)*0.5f;
     float span = fmaxf(fmaxf(maxX-minX, maxY-minY), fmaxf(maxZ-minZ, 1.0f));
-    float scale = fminf(canvasSize.x, canvasSize.y) * 0.35f / span;
+    float scale = fminf(canvasSize.x, canvasSize.y) * 0.35f / span * m_zoom;
     ImVec2 center(canvasPos.x + canvasSize.x*0.5f, canvasPos.y + canvasSize.y*0.5f);
     auto project = [&](float px, float py, float pz) -> ImVec2 {
         float dx=px-midX, dy=py-midY, dz=pz-midZ;
