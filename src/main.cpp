@@ -18,7 +18,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
     // 2. Fenster erstellen
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Anti-Gravity Kinematik Simulation", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "Linearsystem Simulation", nullptr, nullptr);
     if (!window) {
         glfwTerminate();
         return -1;
