@@ -35,14 +35,14 @@ private:
 
     // Pick-Positionen Popup
     bool m_showPickPopup = false;
-    Vec3 m_firstPick = {0, 0, 0};
-    Vec3 m_lastPick = {100, 100, 0};
-    int m_gridCols = 2;    // Spalten (X-Richtung)
-    int m_gridRows = 2;    // Reihen (Y-Richtung)
-    int m_gridLayers = 3;  // Ebenen (Z-Richtung)
+    Vec3 m_firstPick = {0, 0, 50};
+    Vec3 m_lastPick = {100, 0, -50};
+    float m_pitchHoriz = 25.0f;  // Abstand horizontal [mm]
+    float m_pitchZ = 25.0f;      // Abstand Z (Ebenen) [mm]
     std::vector<Vec3> m_previewPicks;
     bool m_previewReady = false;
     float m_prevRotX = 0.45f;
     float m_prevRotZ = 0.78f;
     float m_prevZoom = 1.0f;
+    char m_detectedPlane[64] = "";
 };

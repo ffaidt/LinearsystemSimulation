@@ -337,35 +337,63 @@ void Gui::renderPickPreview3D(ImVec2 canvasPos, ImVec2 canvasSize) {
 }
 
 void Gui::renderPickPopup() {
-    ImVec2 popupSize(700, 550);
+    ImVec2 popupSize(720, 580);
     ImGui::SetNextWindowSize(popupSize, ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal("PickGenerator", nullptr, ImGuiWindowFlags_NoResize)) {
         ImGui::Text("Pick-Positionen Grid-Generator");
         ImGui::Separator();
 
-        ImGui::Text("First Pick (oben links, oberste Ebene):");
+        ImGui::Text("First Pick (oberste Ebene, erste Position):");
         ImGui::DragFloat("First X", &m_firstPick.x, 0.5f, 0.0f, 0.0f, "%.1f mm");
         ImGui::SameLine(); ImGui::DragFloat("First Y", &m_firstPick.y, 0.5f, 0.0f, 0.0f, "%.1f mm");
         ImGui::SameLine(); ImGui::DragFloat("First Z", &m_firstPick.z, 0.5f, 0.0f, 0.0f, "%.1f mm");
 
-        ImGui::Text("Last Pick (unten rechts, unterste Ebene):");
+        ImGui::Text("Last Pick (unterste Ebene, letzte Position):");
         ImGui::DragFloat("Last X", &m_lastPick.x, 0.5f, 0.0f, 0.0f, "%.1f mm");
         ImGui::SameLine(); ImGui::DragFloat("Last Y", &m_lastPick.y, 0.5f, 0.0f, 0.0f, "%.1f mm");
         ImGui::SameLine(); ImGui::DragFloat("Last Z", &m_lastPick.z, 0.5f, 0.0f, 0.0f, "%.1f mm");
 
-        ImGui::DragInt("Spalten (X)", &m_gridCols, 0.1f, 1, 50);
-        ImGui::SameLine(); ImGui::DragInt("Reihen (Y)", &m_gridRows, 0.1f, 1, 50);
-        ImGui::SameLine(); ImGui::DragInt("Ebenen (Z)", &m_gridLayers, 0.1f, 1, 50);
+        ImGui::Separator();
+
+        // Ebene erkennen
+        float dx = std::abs(m_lastPick.x - m_firstPick.x);
+        float dy = std::abs(m_lastPick.y - m_firstPick.y);
+        float dz = std::abs(m_lastPick.z - m_firstPick.z);
+        bool xSame = dx < 0.1f;
+        bool ySame = dy < 0.1f;
+
+        if (xSame && ySame) {
+            snprintf(m_detectedPlane, sizeof(m_detectedPlane), "Nur Z-Achse (Stapel). X=Y=const.");
+        } else if (xSame) {
+            snprintf(m_detectedPlane, sizeof(m_detectedPlane), "Y-Z Ebene erkannt (X = %.1f mm = const.)", m_firstPick.x);
+        } else if (ySame) {
+            snprintf(m_detectedPlane, sizeof(m_detectedPlane), "X-Z Ebene erkannt (Y = %.1f mm = const.)", m_firstPick.y);
+        } else {
+            snprintf(m_detectedPlane, sizeof(m_detectedPlane), "X-Y-Z Volumen (beide Achsen variieren)");
+        }
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.6f, 1.0f), "%s", m_detectedPlane);
+
+        ImGui::DragFloat("Abstand horizontal [mm]", &m_pitchHoriz, 0.5f, 1.0f, 1000.0f, "%.1f mm");
+        ImGui::DragFloat("Abstand Z (Ebenen) [mm]", &m_pitchZ, 0.5f, 1.0f, 1000.0f, "%.1f mm");
+
+        // Berechne Anzahl
+        int nHoriz = 1, nHorizY = 1, nZ = 1;
+        if (!xSame && m_pitchHoriz > 0.1f) nHoriz = std::max(1, (int)std::round(dx / m_pitchHoriz) + 1);
+        if (!ySame && m_pitchHoriz > 0.1f) nHorizY = std::max(1, (int)std::round(dy / m_pitchHoriz) + 1);
+        if (dz > 0.1f && m_pitchZ > 0.1f) nZ = std::max(1, (int)std::round(dz / m_pitchZ) + 1);
+
+        int total = nHoriz * nHorizY * nZ;
+        ImGui::Text("Ergibt: %d x %d x %d = %d Positionen", nHoriz, nHorizY, nZ, total);
 
         if (ImGui::Button("Vorschau generieren", ImVec2(-1, 28))) {
             m_previewPicks.clear();
-            // Reihenfolge: Spalte fuer Spalte, jede Spalte von oben nach unten
-            for (int col = 0; col < m_gridCols; ++col) {
-                for (int row = 0; row < m_gridRows; ++row) {
-                    for (int layer = 0; layer < m_gridLayers; ++layer) {
-                        float fx = (m_gridCols > 1) ? (float)col / (m_gridCols - 1) : 0.0f;
-                        float fy = (m_gridRows > 1) ? (float)row / (m_gridRows - 1) : 0.0f;
-                        float fz = (m_gridLayers > 1) ? (float)layer / (m_gridLayers - 1) : 0.0f;
+            // Reihenfolge: Spalte fuer Spalte (horiz), jede Spalte von oben nach unten
+            for (int ix = 0; ix < nHoriz; ++ix) {
+                for (int iy = 0; iy < nHorizY; ++iy) {
+                    for (int iz = 0; iz < nZ; ++iz) {
+                        float fx = (nHoriz > 1) ? (float)ix / (nHoriz - 1) : 0.0f;
+                        float fy = (nHorizY > 1) ? (float)iy / (nHorizY - 1) : 0.0f;
+                        float fz = (nZ > 1) ? (float)iz / (nZ - 1) : 0.0f;
                         Vec3 p;
                         p.x = m_firstPick.x + fx * (m_lastPick.x - m_firstPick.x);
                         p.y = m_firstPick.y + fy * (m_lastPick.y - m_firstPick.y);
