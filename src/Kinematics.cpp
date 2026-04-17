@@ -236,19 +236,19 @@ SimulationResult Kinematics::calculatePickPlace(const PickPlaceConfig& cfg, floa
         float pickY = cfg.pickPositions[p].y;
         float pickZ = cfg.pickPositions[p].z;
 
-        // 1. Z alleine hoch auf sichere Hoehe (raus aus der Kiste)
+        // 1. Z alleine hoch auf sichere Hoehe (OHNE Soft-Rampe, normales Profil)
         t = appendZMove(res, curX, curY, curZ, cfg.safeZ, cfg.vmax_z, cfg.amax_z,
-                        cfg.softDistance, cfg.softAccel, t, dt);
+                        0, 0, t, dt);  // softDist=0, softAccel=0 → kein Soft
         curZ = cfg.safeZ;
 
-        // 2. XYZ GLEICHZEITIG zur Pick-XY + sichere Hoehe
-        //    (oberhalb safeZ ist keine Kollision moeglich)
+        // 2. XYZ GLEICHZEITIG zur Pick-Position (XY + safeZ, da Pick unter safeZ)
+        //    Ziel-Z = safeZ (Pick ist in der Kiste, Z geht erst spaeter alleine runter)
         t = appendXYZMove(res, curX, curY, curZ, pickX, pickY, cfg.safeZ,
                           cfg.vmax_x, cfg.vmax_y, cfg.vmax_z,
                           cfg.amax_x, cfg.amax_y, cfg.amax_z, t, dt);
         curX = pickX; curY = pickY; curZ = cfg.safeZ;
 
-        // 3. Z alleine runter zur Pick-Hoehe (sanft in die Kiste)
+        // 3. Z alleine runter zur Pick-Hoehe (MIT Soft-Rampe: sanft in die Kiste)
         t = appendZMove(res, curX, curY, curZ, pickZ, cfg.vmax_z, cfg.amax_z,
                         cfg.softDistance, cfg.softAccel, t, dt);
         curZ = pickZ;
@@ -256,29 +256,25 @@ SimulationResult Kinematics::calculatePickPlace(const PickPlaceConfig& cfg, floa
         // 4. Verweilen am Pick
         t = appendDwell(res, curX, curY, curZ, cfg.dwellTime, t, dt);
 
-        // 5. Z alleine hoch auf sichere Hoehe (raus aus der Kiste)
+        // 5. Z alleine hoch auf sichere Hoehe (MIT Soft-Rampe: sanft aus der Kiste)
         t = appendZMove(res, curX, curY, curZ, cfg.safeZ, cfg.vmax_z, cfg.amax_z,
                         cfg.softDistance, cfg.softAccel, t, dt);
         curZ = cfg.safeZ;
 
-        // 6. XYZ GLEICHZEITIG zur Place-Position + sichere Hoehe
+        // 6. XYZ GLEICHZEITIG zur Place-Position inkl. Place-Z
+        //    Z faehrt von safeZ direkt zur Place-Hoehe mit (alle 3 Achsen parallel)
         t = appendXYZMove(res, curX, curY, curZ,
-                          cfg.placePosition.x, cfg.placePosition.y, cfg.safeZ,
+                          cfg.placePosition.x, cfg.placePosition.y, cfg.placePosition.z,
                           cfg.vmax_x, cfg.vmax_y, cfg.vmax_z,
                           cfg.amax_x, cfg.amax_y, cfg.amax_z, t, dt);
-        curX = cfg.placePosition.x; curY = cfg.placePosition.y; curZ = cfg.safeZ;
+        curX = cfg.placePosition.x; curY = cfg.placePosition.y; curZ = cfg.placePosition.z;
 
-        // 7. Z alleine runter zur Place-Hoehe
-        t = appendZMove(res, curX, curY, curZ, cfg.placePosition.z, cfg.vmax_z, cfg.amax_z,
-                        cfg.softDistance, cfg.softAccel, t, dt);
-        curZ = cfg.placePosition.z;
-
-        // 8. Verweilen am Place
+        // 7. Verweilen am Place
         t = appendDwell(res, curX, curY, curZ, cfg.dwellTime, t, dt);
 
-        // 9. Z alleine hoch auf sichere Hoehe (fuer naechsten Pick)
+        // 8. Z alleine hoch auf sichere Hoehe (OHNE Soft-Rampe)
         t = appendZMove(res, curX, curY, curZ, cfg.safeZ, cfg.vmax_z, cfg.amax_z,
-                        cfg.softDistance, cfg.softAccel, t, dt);
+                        0, 0, t, dt);
         curZ = cfg.safeZ;
     }
 
