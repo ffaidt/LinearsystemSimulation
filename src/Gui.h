@@ -1,6 +1,7 @@
 #pragma once
 #include "Config.h"
 #include "Kinematics.h"
+#include <imgui.h>
 
 class Gui {
 public:
@@ -24,10 +25,12 @@ private:
     
     // Animations-State
     void renderAnimation();
+    void render3DView(int currentIndex, int count, ImVec2 canvasPos, ImVec2 canvasSize);
     float m_animationTime = 0.0f;
     bool m_isPlaying = false;
     
-    // Isometrische Pfad-Daten
-    std::vector<float> m_isoU;
-    std::vector<float> m_isoV;
+    // 3D-Rotation (per Maus-Drag)
+    float m_rotX = 0.45f;  // Elevation (~25°)
+    float m_rotZ = 0.78f;  // Azimut (~45°)
+    bool m_isDragging3D = false;
 };
