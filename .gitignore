@@ -1,0 +1,32 @@
+# Build directories
+build/
+bin/
+obj/
+out/
+.cmake/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.sln
+*.vcxproj
+*.vcxproj.filters
+
+# User-specific configuration
+config.json
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+
+# Ignore compiled executables and libraries
+*.exe
+*.dll
+*.lib
+*.so
+*.dylib
+*.a
+
+# OS generated files
+.DS_Store
+Thumbs.db
